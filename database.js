@@ -139,18 +139,20 @@ async function seedAdmin() {
 // ─── Unified Async Queries ────────────────────────────────────────────────────
 const queries = {
   getBookingsByDate: {
-    all: async (date, court) => {
+    all: async (date, courtOrCourts) => {
+      const courts = Array.isArray(courtOrCourts) ? courtOrCourts : [courtOrCourts];
       if (tursoClient) {
         await initTursoSchema();
+        const placeholders = courts.map(() => '?').join(',');
         const res = await tursoClient.execute({
-          sql: "SELECT * FROM bookings WHERE booking_date = ? AND court_type = ? AND status != 'cancelled' ORDER BY start_time ASC",
-          args: [date, court]
+          sql: `SELECT * FROM bookings WHERE booking_date = ? AND court_type IN (${placeholders}) AND status != 'cancelled' ORDER BY start_time ASC`,
+          args: [date, ...courts]
         });
         return res.rows;
       }
       const data = loadLocalData();
       return data.bookings
-        .filter(b => b.booking_date === date && b.court_type === court && b.status !== 'cancelled')
+        .filter(b => b.booking_date === date && courts.includes(b.court_type) && b.status !== 'cancelled')
         .sort((a, b) => a.start_time.localeCompare(b.start_time));
     }
   },
@@ -267,17 +269,19 @@ const queries = {
   },
 
   getBlockedSlots: {
-    all: async (date, court) => {
+    all: async (date, courtOrCourts) => {
+      const courts = Array.isArray(courtOrCourts) ? courtOrCourts : [courtOrCourts];
       if (tursoClient) {
         await initTursoSchema();
+        const placeholders = courts.map(() => '?').join(',');
         const res = await tursoClient.execute({
-          sql: "SELECT * FROM blocked_slots WHERE block_date = ? AND court_type = ?",
-          args: [date, court]
+          sql: `SELECT * FROM blocked_slots WHERE block_date = ? AND court_type IN (${placeholders})`,
+          args: [date, ...courts]
         });
         return res.rows;
       }
       const data = loadLocalData();
-      return data.blocked_slots.filter(s => s.block_date === date && s.court_type === court);
+      return data.blocked_slots.filter(s => s.block_date === date && courts.includes(s.court_type));
     }
   },
 

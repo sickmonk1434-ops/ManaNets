@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { queries } = require('../database');
-const { COURTS, calculatePrice, isSlotAvailable } = require('../pricing');
+const { COURTS, calculatePrice, isSlotAvailable, getRelatedCourtTypes } = require('../pricing');
 
 // Authentication Middleware
 function requireAdmin(req, res, next) {
@@ -74,11 +74,12 @@ router.post('/book', requireAdmin, async (req, res) => {
     }
 
     const duration = parseFloat(hours);
-    const bookings = await queries.getBookingsByDate.all(booking_date, court_type);
-    const blocked = await queries.getBlockedSlots.all(booking_date, court_type);
+    const relatedCourts = getRelatedCourtTypes(court_type);
+    const bookings = await queries.getBookingsByDate.all(booking_date, relatedCourts);
+    const blocked = await queries.getBlockedSlots.all(booking_date, relatedCourts);
 
     if (!isSlotAvailable(start_time, duration, bookings, blocked)) {
-      return res.status(409).json({ error: 'Slot conflict: This time slot is already booked or blocked' });
+      return res.status(409).json({ error: 'Slot conflict: This time slot is already booked or blocked (including shared court activities)' });
     }
 
     const pricing = calculatePrice(court_type, booking_date, duration);

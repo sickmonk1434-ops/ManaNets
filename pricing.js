@@ -6,12 +6,24 @@
 const OPEN_HOUR = 6;
 const CLOSE_HOUR = 23;
 
-// Court definitions
+// Court definitions with physical court sharing
+// Notice: 'cricket-small' and 'football-small' share the same physical space ('small-court')
 const COURTS = {
-  'cricket-small': { label: 'Cricket Net 1 (Small)', sport: 'cricket', maxHours: 4 },
-  'cricket-big':   { label: 'Cricket Net 2 (Big)',   sport: 'cricket', maxHours: 4 },
-  'volleyball':    { label: 'Volleyball Court',      sport: 'volleyball', maxHours: 4 },
+  'cricket-small':  { label: 'Cricket Net 1 (Small)',  sport: 'cricket',  maxHours: 4, physicalCourt: 'small-court' },
+  'cricket-big':    { label: 'Cricket Net 2 (Big)',    sport: 'cricket',  maxHours: 4, physicalCourt: 'big-court' },
+  'football-small': { label: 'Small Court (Football)', sport: 'football', maxHours: 4, physicalCourt: 'small-court' },
+  'volleyball':     { label: 'Volleyball Court',       sport: 'volleyball', maxHours: 4, physicalCourt: 'volleyball-court' },
 };
+
+/**
+ * Returns all court IDs that share the same physical court space
+ */
+function getRelatedCourtTypes(courtType) {
+  const courtInfo = COURTS[courtType];
+  if (!courtInfo) return [courtType];
+  const phys = courtInfo.physicalCourt;
+  return Object.keys(COURTS).filter(c => COURTS[c].physicalCourt === phys);
+}
 
 /**
  * Returns true if date (YYYY-MM-DD) is Saturday or Sunday
@@ -70,7 +82,7 @@ function calculatePrice(courtType, dateStr, hours) {
   const duration = parseFloat(hours);
 
   let ratePerHour;
-  if (courtType === 'cricket-small') {
+  if (courtType === 'cricket-small' || courtType === 'football-small') {
     ratePerHour = weekend ? 400 : 300;
   } else if (courtType === 'cricket-big') {
     ratePerHour = weekend ? 500 : 400;
@@ -139,11 +151,21 @@ function getSlotsWithStatus(dateStr, courtType, bookings, blockedSlots) {
     });
 
     if (bookingMatch) {
+      // If booked for the other sport on the shared small court, show custom label!
+      let displayLabel = 'Booked';
+      if (bookingMatch.court_type !== courtType) {
+        const otherSport = COURTS[bookingMatch.court_type] ? COURTS[bookingMatch.court_type].sport : '';
+        if (otherSport === 'football') displayLabel = 'Booked (Football)';
+        else if (otherSport === 'cricket') displayLabel = 'Booked (Cricket)';
+        else displayLabel = `Booked (${otherSport})`;
+      }
+
       return {
         ...slot,
         status: 'booked',
         available: false,
-        label: 'Booked',
+        label: displayLabel,
+        bookedCourtType: bookingMatch.court_type,
         bookingId: bookingMatch.id
       };
     }
@@ -207,6 +229,7 @@ module.exports = {
   COURTS,
   OPEN_HOUR,
   CLOSE_HOUR,
+  getRelatedCourtTypes,
   isWeekend,
   timeToMinutes,
   minutesToTime,

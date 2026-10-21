@@ -123,6 +123,7 @@ function renderBookingsTable() {
   const courtLabels = {
     'cricket-small': '🏏 Net 1 (Small)',
     'cricket-big': '🏏 Net 2 (Big)',
+    'football-small': '⚽ Small Court (Football)',
     'volleyball': '🏐 Volleyball'
   };
 

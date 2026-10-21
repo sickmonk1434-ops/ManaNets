@@ -39,55 +39,88 @@ function get(path) {
 }
 
 async function runTests() {
-  console.log('=== Test 1: 30-minute slot price calculation ===');
-  // 0.5 hr on weekday small net (₹300/hr -> ₹150)
-  let res = await post('/api/calculate-price', { court: 'cricket-small', date: '2026-10-21', hours: 0.5 });
-  console.log('0.5 Hr Weekday Small Net:', res.data);
+  console.log('=== Test 1: Cross-Sport Court Sharing (Cricket Small Net vs Football) ===');
+  const testDate = '2026-10-25';
 
-  // 1.5 hrs on weekday small net (₹300/hr -> ₹450)
-  res = await post('/api/calculate-price', { court: 'cricket-small', date: '2026-10-21', hours: 1.5 });
-  console.log('1.5 Hrs Weekday Small Net:', res.data);
-
-  // 3.0 hrs on weekday small net (₹300/hr, 2+1 free applied -> 2 hrs billed = ₹600)
-  res = await post('/api/calculate-price', { court: 'cricket-small', date: '2026-10-21', hours: 3.0 });
-  console.log('3.0 Hrs Weekday 2+1 Free:', res.data);
-
-  console.log('\n=== Test 2: Fetch 30-min slots for a court ===');
-  res = await get('/api/slots?date=2026-10-21&court=cricket-small');
-  console.log(`Fetched ${res.data.slots.length} 30-minute slots.`);
-  console.log('Sample slot:', res.data.slots.find(s => s.time === '17:00'));
-
-  console.log('\n=== Test 3: Create Booking at 05:00 PM (17:00) for 1 hour ===');
-  res = await post('/api/book', {
-    customer_name: 'Test Batsman',
-    customer_phone: '9988776655',
+  // Step 1: Book Cricket Net 1 (Small) at 19:00 for 1 hour
+  console.log('1. Booking Cricket Net 1 at 19:00...');
+  let res = await post('/api/book', {
+    customer_name: 'Cricket Player',
+    customer_phone: '9876500001',
     court_type: 'cricket-small',
-    booking_date: '2026-10-21',
-    start_time: '17:00',
+    booking_date: testDate,
+    start_time: '19:00',
     hours: 1.0,
-    notes: 'Testing 30-min interval booking'
+    notes: 'Cricket session on small net'
   });
-  console.log('Booking Result:', res.data);
+  console.log('Cricket Booking Result:', res.status, res.data);
 
-  console.log('\n=== Test 4: Verify 05:00 PM and 05:30 PM are now marked "booked" ===');
-  res = await get('/api/slots?date=2026-10-21&court=cricket-small');
-  const slot1700 = res.data.slots.find(s => s.time === '17:00');
-  const slot1730 = res.data.slots.find(s => s.time === '17:30');
-  const slot1800 = res.data.slots.find(s => s.time === '18:00');
-  console.log('17:00 slot status:', slot1700.status, `(available: ${slot1700.available})`);
-  console.log('17:30 slot status:', slot1730.status, `(available: ${slot1730.available})`);
-  console.log('18:00 slot status:', slot1800.status, `(available: ${slot1800.available})`);
+  // Step 2: Query slots for Football on the Small Court
+  console.log('2. Querying slots for Football on Small Court...');
+  res = await get(`/api/slots?date=${testDate}&court=football-small`);
+  const footballSlot1900 = res.data.slots.find(s => s.time === '19:00');
+  const footballSlot1930 = res.data.slots.find(s => s.time === '19:30');
+  const footballSlot2000 = res.data.slots.find(s => s.time === '20:00');
+  console.log('Football 19:00 slot:', {
+    status: footballSlot1900.status,
+    label: footballSlot1900.label,
+    available: footballSlot1900.available
+  });
+  console.log('Football 19:30 slot:', {
+    status: footballSlot1930.status,
+    label: footballSlot1930.label,
+    available: footballSlot1930.available
+  });
+  console.log('Football 20:00 slot:', {
+    status: footballSlot2000.status,
+    available: footballSlot2000.available
+  });
 
-  console.log('\n=== Test 5: Overlap prevention (trying to book overlapping slot) ===');
+  // Step 3: Attempt to book Football at the same time (19:00)
+  console.log('3. Attempting conflicting Football booking at 19:00...');
   res = await post('/api/book', {
-    customer_name: 'Conflicting Booking',
-    customer_phone: '9123456789',
-    court_type: 'cricket-small',
-    booking_date: '2026-10-21',
-    start_time: '17:30',
+    customer_name: 'Football Team',
+    customer_phone: '9876500002',
+    court_type: 'football-small',
+    booking_date: testDate,
+    start_time: '19:00',
     hours: 1.0
   });
-  console.log('Overlap booking response (expected 409 conflict):', res.status, res.data);
+  console.log('Conflicting Football Booking (Expected 409):', res.status, res.data.error);
+
+  // Step 4: Book Football on Small Court at 20:00 for 1 hour
+  console.log('4. Booking Football at 20:00...');
+  res = await post('/api/book', {
+    customer_name: 'Football Strikers',
+    customer_phone: '9876500003',
+    court_type: 'football-small',
+    booking_date: testDate,
+    start_time: '20:00',
+    hours: 1.0
+  });
+  console.log('Football Booking Result:', res.status, res.data);
+
+  // Step 5: Query slots for Cricket on Net 1 (Small)
+  console.log('5. Querying Cricket Net 1 slots at 20:00...');
+  res = await get(`/api/slots?date=${testDate}&court=cricket-small`);
+  const cricketSlot2000 = res.data.slots.find(s => s.time === '20:00');
+  console.log('Cricket 20:00 slot:', {
+    status: cricketSlot2000.status,
+    label: cricketSlot2000.label,
+    available: cricketSlot2000.available
+  });
+
+  // Step 6: Attempt to book Cricket at 20:00
+  console.log('6. Attempting conflicting Cricket booking at 20:00...');
+  res = await post('/api/book', {
+    customer_name: 'Cricket Batsman',
+    customer_phone: '9876500004',
+    court_type: 'cricket-small',
+    booking_date: testDate,
+    start_time: '20:00',
+    hours: 1.0
+  });
+  console.log('Conflicting Cricket Booking (Expected 409):', res.status, res.data.error);
 }
 
 runTests().catch(console.error);

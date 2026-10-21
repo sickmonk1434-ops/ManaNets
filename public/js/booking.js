@@ -14,6 +14,9 @@ const COURTS_BY_SPORT = {
     { id: 'cricket-small', label: 'Cricket Net 1 (Small Net)' },
     { id: 'cricket-big',   label: 'Cricket Net 2 (Big Net)' }
   ],
+  football: [
+    { id: 'football-small', label: 'Small Court (Football Turf)' }
+  ],
   volleyball: [
     { id: 'volleyball',    label: 'Volleyball Court' }
   ]
@@ -190,9 +193,9 @@ function renderSlotsGrid() {
     // Subtitle label for booked/blocked status
     let subHtml = '';
     if (slot.status === 'booked') {
-      subHtml = `<span class="slot-sub">Booked</span>`;
+      subHtml = `<span class="slot-sub">${slot.label || 'Booked'}</span>`;
       pill.disabled = true;
-      pill.title = 'This slot is already booked';
+      pill.title = `Slot is booked: ${slot.label}`;
     } else if (slot.status === 'blocked') {
       subHtml = `<span class="slot-sub">${slot.label || 'Blocked'}</span>`;
       pill.disabled = true;
