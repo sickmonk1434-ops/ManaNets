@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login — ManaNets</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+
+  <div class="card" style="width: 100%; max-width: 420px; margin: 1rem;">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <a href="/" class="brand" style="justify-content: center; margin-bottom: 0.5rem;">
+        <span>🏏 ManaNets</span>
+      </a>
+      <h2 style="font-size: 1.3rem; margin-top: 0.5rem;">Admin Portal</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem;">Enter administrator credentials to manage slots and bookings</p>
+    </div>
+
+    <div id="loginError" style="display: none; background: #7f1d1d; color: #fecaca; padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem; border: 1px solid #dc2626;"></div>
+
+    <form id="adminLoginForm">
+      <div class="form-group">
+        <label for="username">Admin ID</label>
+        <input type="text" id="username" placeholder="Username" required value="ManaNets">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Password" required value="Nets@1434">
+      </div>
+
+      <button type="submit" class="btn-primary" id="loginBtn" style="margin-top: 0.5rem;">
+        Sign In to Dashboard
+      </button>
+
+      <div style="margin-top: 1.25rem; text-align: center;">
+        <a href="/" style="color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">← Back to Public Booking</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const errBox = document.getElementById('loginError');
+      const btn = document.getElementById('loginBtn');
+
+      errBox.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Authenticating...';
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          window.location.href = '/dashboard';
+        } else {
+          errBox.textContent = data.error || 'Invalid credentials';
+          errBox.style.display = 'block';
+        }
+      } catch (err) {
+        errBox.textContent = 'Server error. Please verify the backend is running.';
+        errBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign In to Dashboard';
+      }
+    });
+  </script>
+</body>
+</html>

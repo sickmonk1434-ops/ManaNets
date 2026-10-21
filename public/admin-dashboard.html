@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — ManaNets</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- Admin Header -->
+  <header>
+    <div class="container nav-bar">
+      <a href="/dashboard" class="brand">
+        <span>🏏 ManaNets</span>
+        <span class="brand-badge" style="background: #2563eb;">Admin Console</span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <span id="adminGreeting" style="font-size: 0.85rem; color: var(--text-muted);">Admin: ManaNets</span>
+        <a href="/" target="_blank" class="btn-secondary" style="font-size: 0.8rem; text-decoration: none;">Public Site ↗</a>
+        <button id="logoutBtn" class="btn-secondary" style="font-size: 0.8rem;">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Quick Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Bookings</div>
+        <div class="stat-val" id="statTotalBookings">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active / Paid Slots</div>
+        <div class="stat-val" id="statActiveBookings" style="color: var(--primary);">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-val" id="statTotalRevenue" style="color: var(--accent);">₹0</div>
+      </div>
+    </div>
+
+    <!-- Admin Navigation Tabs -->
+    <div class="admin-nav">
+      <button class="admin-tab active" data-target="tabBookings">📋 All Bookings</button>
+      <button class="admin-tab" data-target="tabManual">➕ Manual / Walk-in Booking</button>
+      <button class="admin-tab" data-target="tabBlock">🔒 Block Maintenance Slot</button>
+    </div>
+
+    <!-- Tab 1: Bookings Management -->
+    <div id="tabBookings" class="tab-content active">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+          <h2 class="card-title" style="margin: 0; border: none; padding: 0;">Reservations</h2>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <input type="date" id="filterDate" class="input-control" style="width: auto; padding: 0.4rem 0.8rem;">
+            <select id="filterCourt" class="input-control" style="width: auto; padding: 0.4rem 0.8rem;">
+              <option value="">All Courts</option>
+              <option value="cricket-small">Cricket Net 1 (Small)</option>
+              <option value="cricket-big">Cricket Net 2 (Big)</option>
+              <option value="volleyball">Volleyball Court</option>
+            </select>
+            <button id="btnRefresh" class="btn-secondary" style="padding: 0.4rem 0.8rem;">🔄 Refresh</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Court</th>
+                <th>Time & Hrs</th>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="bookingsTableBody">
+              <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-muted);">Loading bookings...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Manual / Walk-in Booking -->
+    <div id="tabManual" class="tab-content">
+      <div class="card" style="max-width: 600px; margin: 0 auto;">
+        <h2 class="card-title">Book Slot for Walk-in / Phone Customer</h2>
+        <form id="adminManualForm">
+          <div class="form-group">
+            <label>Court</label>
+            <select id="manualCourt" required>
+              <option value="cricket-small">Cricket Net 1 (Small)</option>
+              <option value="cricket-big">Cricket Net 2 (Big)</option>
+              <option value="volleyball">Volleyball Court</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="manualDate" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label>Start Time (HH:00)</label>
+              <select id="manualStartTime" required></select>
+            </div>
+            <div class="form-group">
+              <label>Duration (Hours)</label>
+              <select id="manualHours" required>
+                <option value="0.5">30 Minutes (0.5 Hr)</option>
+                <option value="1" selected>1 Hour</option>
+                <option value="1.5">1.5 Hours</option>
+                <option value="2">2 Hours</option>
+                <option value="2.5">2.5 Hours</option>
+                <option value="3">3 Hours (2+1 eligible)</option>
+                <option value="3.5">3.5 Hours</option>
+                <option value="4">4 Hours</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Customer Name</label>
+            <input type="text" id="manualName" placeholder="Customer Name" required>
+          </div>
+
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" id="manualPhone" placeholder="Mobile Number" value="Walk-in">
+          </div>
+
+          <div class="form-group">
+            <label>Price Override (₹) - Optional</label>
+            <input type="number" id="manualPrice" placeholder="Leave empty for automatic calculated price">
+          </div>
+
+          <div class="form-group">
+            <label>Internal Notes</label>
+            <input type="text" id="manualNotes" placeholder="e.g. Paid in cash at counter">
+          </div>
+
+          <button type="submit" class="btn-primary">Reserve Slot (Admin)</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tab 3: Maintenance / Block Slot -->
+    <div id="tabBlock" class="tab-content">
+      <div class="card" style="max-width: 600px; margin: 0 auto;">
+        <h2 class="card-title">Block Slot (Maintenance / Rain / Coaching)</h2>
+        <form id="blockSlotForm">
+          <div class="form-group">
+            <label>Court</label>
+            <select id="blockCourt" required>
+              <option value="cricket-small">Cricket Net 1 (Small)</option>
+              <option value="cricket-big">Cricket Net 2 (Big)</option>
+              <option value="volleyball">Volleyball Court</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="blockDate" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label>Start Time</label>
+              <select id="blockStartTime" required></select>
+            </div>
+            <div class="form-group">
+              <label>Duration (Hours)</label>
+              <select id="blockHours" required>
+                <option value="1">1 Hour</option>
+                <option value="2">2 Hours</option>
+                <option value="3">3 Hours</option>
+                <option value="4">4 Hours</option>
+                <option value="8">8 Hours (Full Day)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Reason</label>
+            <input type="text" id="blockReason" placeholder="e.g. Pitch Maintenance / Net Repair" required>
+          </div>
+
+          <button type="submit" class="btn-primary" style="background: #b45309;">Block Time Slot</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ManaNets — Box Cricket & Volleyball Court Booking</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header>
+    <div class="container nav-bar">
+      <a href="/" class="brand">
+        <span style="font-size: 1.5rem;">🏏</span>
+        <span>ManaNets</span>
+        <span class="brand-badge">Sports Arena</span>
+      </a>
+      <div class="nav-links">
+        <a href="#pricing">Tariff & Offers</a>
+        <a href="/admin" class="admin-btn">🔐 Admin Portal</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Promotional Strip -->
+    <div class="promo-strip" id="pricing">
+      <div class="promo-title">
+        <span class="promo-tag">LIMITED OFFER</span>
+        <span>🏏 Weekday Special: <strong>2 + 1 FREE</strong> on Cricket Nets (Book 3 hrs, pay for 2)</span>
+      </div>
+      <div class="promo-rates">
+        <span class="rate-badge">🏏 Net 1 (Small): ₹300 (Wkday) / ₹400 (Wknd)</span>
+        <span class="rate-badge">🏏 Net 2 (Big): ₹400 (Wkday) / ₹500 (Wknd)</span>
+        <span class="rate-badge">🏐 Volleyball: ₹500 (Wkday) / ₹600 (Wknd)</span>
+      </div>
+    </div>
+
+    <!-- Booking Layout -->
+    <div class="booking-layout">
+      
+      <!-- Left: Booking Form matching the user's design -->
+      <div class="booking-card">
+        
+        <!-- Row 1: Sports -->
+        <div class="form-row">
+          <label class="form-label" for="sportSelect">Sports</label>
+          <div class="custom-select-wrap">
+            <select id="sportSelect" class="custom-select">
+              <option value="cricket">Cricket</option>
+              <option value="volleyball">Volleyball</option>
+            </select>
+            <div class="input-icon-right">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Date -->
+        <div class="form-row">
+          <label class="form-label" for="bookingDate">Date</label>
+          <div class="custom-input-wrap">
+            <input type="date" id="bookingDate" class="custom-input">
+            <div class="input-icon-right">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Start Time with 30-min Popup -->
+        <div class="form-row">
+          <label class="form-label" for="startTimeInput">Start Time</label>
+          <div class="custom-input-wrap" style="position: relative;">
+            <div id="startTimeDisplay" class="custom-input" tabindex="0">
+              <span id="selectedTimeText">05:00 PM</span>
+              <div class="input-icon-right" style="position: static; margin-left: auto;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+            </div>
+
+            <!-- 2-Column Floating 30-min Interval Dropdown Popup -->
+            <div class="time-dropdown-popup" id="timeDropdownPopup">
+              <div class="popup-legend">
+                <div class="legend-item"><span class="legend-dot dot-avail"></span> Available</div>
+                <div class="legend-item"><span class="legend-dot dot-booked"></span> Booked</div>
+                <div class="legend-item"><span class="legend-dot dot-blocked"></span> Blocked</div>
+              </div>
+
+              <!-- 2-Column Grid filled dynamically -->
+              <div class="time-slots-grid" id="timeSlotsGrid">
+                <div style="grid-column: 1 / -1; text-align: center; color: #94a3b8; padding: 1rem;">
+                  Loading slots...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 4: Duration with Minus/Plus Stepper -->
+        <div class="form-row">
+          <label class="form-label">Duration</label>
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div class="duration-stepper">
+              <button type="button" class="stepper-btn stepper-minus" id="btnMinusDuration" title="Decrease 30 mins">−</button>
+              <div class="duration-display" id="durationText">1 Hr</div>
+              <button type="button" class="stepper-btn stepper-plus" id="btnPlusDuration" title="Increase 30 mins">+</button>
+            </div>
+            <div id="promoOfferTag" class="duration-promo-badge" style="display: none;">
+              🎉 2+1 FREE!
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 5: Court -->
+        <div class="form-row">
+          <label class="form-label" for="courtSelect">Court</label>
+          <div class="custom-select-wrap">
+            <select id="courtSelect" class="custom-select">
+              <option value="">--Select Court--</option>
+              <option value="cricket-small" selected>Net 1 (Small Net)</option>
+              <option value="cricket-big">Net 2 (Big Net)</option>
+            </select>
+            <div class="input-icon-right">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collision / Warning message if duration overlaps -->
+        <div id="slotWarningMessage" style="display: none; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem;">
+          ⚠️ Selected duration overlaps with an existing booking or blocked slot.
+        </div>
+
+        <!-- Button: Add To Cart / Book Now -->
+        <button type="button" class="btn-submit-cart active" id="btnAddToCart">
+          Add To Cart / Book Slot
+        </button>
+      </div>
+
+      <!-- Right: Live Pricing Breakdown & Customer Information -->
+      <div class="summary-card">
+        <div class="summary-heading">
+          <span>Booking Summary</span>
+          <span class="court-badge-tag" id="dayTypeBadge">Weekday</span>
+        </div>
+
+        <div class="breakdown-row">
+          <span>Facility</span>
+          <strong id="summaryFacility">Cricket Net 1 (Small)</strong>
+        </div>
+
+        <div class="breakdown-row">
+          <span>Date</span>
+          <strong id="summaryDate">-</strong>
+        </div>
+
+        <div class="breakdown-row">
+          <span>Start Time</span>
+          <strong id="summaryStartTime">05:00 PM</strong>
+        </div>
+
+        <div class="breakdown-row">
+          <span>Duration</span>
+          <strong id="summaryDuration">1 Hr</strong>
+        </div>
+
+        <div class="breakdown-row">
+          <span>Standard Hourly Rate</span>
+          <strong id="summaryHourlyRate">₹300/hr</strong>
+        </div>
+
+        <div class="breakdown-row discount" id="summaryOfferRow" style="display: none;">
+          <span>Weekday 2+1 Offer</span>
+          <span id="summarySavings">- ₹300 (1 Hr Free)</span>
+        </div>
+
+        <div class="breakdown-total">
+          <span>Total Amount</span>
+          <span class="amount" id="summaryTotalAmount">₹300</span>
+        </div>
+
+        <!-- Customer Checkout Form -->
+        <form id="customerCheckoutForm" class="customer-section">
+          <h4>Customer Information</h4>
+
+          <div class="form-group-sm">
+            <label for="customerName">Full Name *</label>
+            <input type="text" id="customerName" placeholder="e.g. Arun Kumar" required>
+          </div>
+
+          <div class="form-group-sm">
+            <label for="customerPhone">Mobile Number *</label>
+            <input type="tel" id="customerPhone" placeholder="10-digit mobile number" pattern="[0-9]{10}" required>
+          </div>
+
+          <div class="form-group-sm">
+            <label for="customerNotes">Special Requests (Optional)</label>
+            <textarea id="customerNotes" rows="2" placeholder="e.g. Need bowling machine or extra balls"></textarea>
+          </div>
+
+          <button type="submit" class="btn-submit-cart active" id="btnFinalConfirm" style="margin-top: 1rem;">
+            Confirm & Reserve Slot Now
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Confirmation Modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <div class="modal-icon-circle">✓</div>
+      <h3 class="modal-title">Booking Confirmed!</h3>
+      <p style="color: #64748b; font-size: 0.95rem;">
+        Your box cricket/volleyball slot has been successfully reserved.
+      </p>
+
+      <div class="modal-receipt">
+        <div class="modal-receipt-row">
+          <span>Booking ID:</span>
+          <strong id="modalBookingId">#MN-101</strong>
+        </div>
+        <div class="modal-receipt-row">
+          <span>Customer:</span>
+          <strong id="modalCustomerName">Arun Kumar</strong>
+        </div>
+        <div class="modal-receipt-row">
+          <span>Facility:</span>
+          <strong id="modalCourtName">Cricket Net 1 (Small)</strong>
+        </div>
+        <div class="modal-receipt-row">
+          <span>Date & Time:</span>
+          <strong id="modalDateTime">2026-10-21 @ 05:00 PM (1 Hr)</strong>
+        </div>
+        <div class="modal-receipt-row" style="border-top: 1px dashed #cbd5e1; padding-top: 6px; margin-top: 6px;">
+          <span>Total Payable:</span>
+          <strong style="color: #059669; font-size: 1.1rem;" id="modalTotalAmount">₹300</strong>
+        </div>
+      </div>
+
+      <button type="button" class="btn-submit-cart active" onclick="closeModalAndReset()">
+        Book Another Slot
+      </button>
+    </div>
+  </div>
+
+  <script src="/js/booking.js"></script>
+</body>
+</html>
