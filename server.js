@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 const publicDir = path.join(process.cwd(), 'public');
 
 // Seed default admin credentials on startup
-seedAdmin();
+seedAdmin().catch(err => console.error('Admin seeding failed:', err));
 
 // Middleware
 app.use(express.json());

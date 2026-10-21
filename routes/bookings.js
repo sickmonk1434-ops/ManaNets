@@ -13,7 +13,7 @@ const {
 } = require('../pricing');
 
 // Get available, booked, and blocked 30-min slots for a given date and court type
-router.get('/slots', (req, res) => {
+router.get('/slots', async (req, res) => {
   try {
     const { date, court } = req.query;
     if (!date || !court) {
@@ -24,8 +24,8 @@ router.get('/slots', (req, res) => {
       return res.status(400).json({ error: 'Invalid court type' });
     }
 
-    const bookings = queries.getBookingsByDate.all(date, court);
-    const blocked = queries.getBlockedSlots.all(date, court);
+    const bookings = await queries.getBookingsByDate.all(date, court);
+    const blocked = await queries.getBlockedSlots.all(date, court);
     const slots = getSlotsWithStatus(date, court, bookings, blocked);
     const isWknd = isWeekend(date);
 
@@ -58,7 +58,7 @@ router.post('/calculate-price', (req, res) => {
 });
 
 // Validate slot range endpoint (checks if a chosen start time + duration has any collisions)
-router.post('/check-availability', (req, res) => {
+router.post('/check-availability', async (req, res) => {
   try {
     const { court, date, start_time, hours } = req.body;
     if (!court || !date || !start_time || !hours) {
@@ -66,8 +66,8 @@ router.post('/check-availability', (req, res) => {
     }
 
     const duration = parseFloat(hours);
-    const bookings = queries.getBookingsByDate.all(date, court);
-    const blocked = queries.getBlockedSlots.all(date, court);
+    const bookings = await queries.getBookingsByDate.all(date, court);
+    const blocked = await queries.getBlockedSlots.all(date, court);
 
     const available = isSlotAvailable(start_time, duration, bookings, blocked);
     res.json({ available });
@@ -77,7 +77,7 @@ router.post('/check-availability', (req, res) => {
 });
 
 // Create a booking
-router.post('/book', (req, res) => {
+router.post('/book', async (req, res) => {
   try {
     const { customer_name, customer_phone, court_type, booking_date, start_time, hours, notes } = req.body;
 
@@ -98,8 +98,8 @@ router.post('/book', (req, res) => {
     const standardStartTime = minutesToTime(timeToMinutes(start_time));
 
     // Verify slot availability
-    const bookings = queries.getBookingsByDate.all(booking_date, court_type);
-    const blocked = queries.getBlockedSlots.all(booking_date, court_type);
+    const bookings = await queries.getBookingsByDate.all(booking_date, court_type);
+    const blocked = await queries.getBlockedSlots.all(booking_date, court_type);
 
     if (!isSlotAvailable(standardStartTime, duration, bookings, blocked)) {
       return res.status(409).json({ error: 'Selected time slot or duration overlaps with an existing booking or blocked slot' });
@@ -107,7 +107,7 @@ router.post('/book', (req, res) => {
 
     const { price, billedHours, offerApplied } = calculatePrice(court_type, booking_date, duration);
 
-    const result = queries.createBooking.run({
+    const result = await queries.createBooking.run({
       customer_name: customer_name.trim(),
       customer_phone: customer_phone.trim(),
       court_type,

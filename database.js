@@ -1,14 +1,33 @@
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { createClient } = require('@libsql/client');
 
-// Determine database file path (use /tmp on Vercel serverless to avoid EROFS read-only error)
-const DB_FILE = process.env.VERCEL
+// Check for Turso credentials (support common env variable names)
+const tursoUrl = process.env.TURSO_DATABASE_URL || process.env.TURSO_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN || process.env.TURSO_TOKEN;
+
+let tursoClient = null;
+if (tursoUrl && tursoToken) {
+  try {
+    tursoClient = createClient({
+      url: tursoUrl,
+      authToken: tursoToken
+    });
+    console.log('⚡ Connected to Turso cloud database:', tursoUrl);
+  } catch (err) {
+    console.error('Failed to initialize Turso client, falling back to local store:', err.message);
+  }
+} else {
+  console.log('ℹ️ Turso credentials not provided. Using local file store.');
+}
+
+// ─── Local Fallback Store ─────────────────────────────────────────────────────
+const LOCAL_DB_FILE = process.env.VERCEL
   ? path.join('/tmp', 'maranets_data.json')
   : path.join(__dirname, 'maranets_data.json');
 
-// Initial schema state
-function getInitialData() {
+function getInitialLocalData() {
   return {
     bookings: [],
     blocked_slots: [],
@@ -18,67 +37,133 @@ function getInitialData() {
   };
 }
 
-// Load data from disk
-function loadData() {
+function loadLocalData() {
   try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+    if (fs.existsSync(LOCAL_DB_FILE)) {
+      const raw = fs.readFileSync(LOCAL_DB_FILE, 'utf-8');
       return JSON.parse(raw);
     }
   } catch (err) {
-    console.error('Warning: could not read db file, initializing fresh:', err.message);
+    console.error('Warning: could not read local db, resetting:', err.message);
   }
-  const init = getInitialData();
-  saveData(init);
+  const init = getInitialLocalData();
+  saveLocalData(init);
   return init;
 }
 
-// Save data to disk synchronously
-function saveData(data) {
+function saveLocalData(data) {
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    fs.writeFileSync(LOCAL_DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Error saving data to db file:', err.message);
+    console.error('Error saving local data:', err.message);
   }
 }
 
-// Global in-memory cache synchronized with disk
-let dbData = loadData();
+// ─── Schema Setup & Seeding ───────────────────────────────────────────────────
+let schemaInitialized = false;
 
-// ─── Seed Admin ───────────────────────────────────────────────────────────────
-function seedAdmin() {
+async function initTursoSchema() {
+  if (!tursoClient || schemaInitialized) return;
+  try {
+    await tursoClient.batch([
+      `CREATE TABLE IF NOT EXISTS bookings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_name TEXT NOT NULL,
+        customer_phone TEXT NOT NULL,
+        court_type TEXT NOT NULL,
+        booking_date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        hours REAL NOT NULL,
+        billed_hours REAL NOT NULL,
+        price REAL NOT NULL,
+        status TEXT DEFAULT 'confirmed',
+        notes TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      );`,
+      `CREATE TABLE IF NOT EXISTS blocked_slots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        court_type TEXT NOT NULL,
+        block_date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        hours REAL NOT NULL DEFAULT 1,
+        reason TEXT DEFAULT 'Admin block'
+      );`,
+      `CREATE TABLE IF NOT EXISTS admin_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL
+      );`
+    ], 'write');
+    schemaInitialized = true;
+    console.log('✅ Turso schema verified');
+  } catch (err) {
+    console.error('Error initializing Turso schema:', err.message);
+  }
+}
+
+async function seedAdmin() {
   const username = process.env.ADMIN_USERNAME || 'ManaNets';
   const password = process.env.ADMIN_PASSWORD || 'Nets@1434';
 
-  dbData = loadData();
-  const existing = dbData.admin_users.find(u => u.username === username);
-  if (!existing) {
-    const hash = bcrypt.hashSync(password, 10);
-    dbData.admin_users.push({
-      id: 1,
-      username,
-      password_hash: hash
-    });
-    saveData(dbData);
-    console.log('✅ Admin user seeded successfully');
+  if (tursoClient) {
+    await initTursoSchema();
+    try {
+      const existing = await tursoClient.execute({
+        sql: 'SELECT id FROM admin_users WHERE username = ?',
+        args: [username]
+      });
+      if (existing.rows.length === 0) {
+        const hash = bcrypt.hashSync(password, 10);
+        await tursoClient.execute({
+          sql: 'INSERT INTO admin_users (username, password_hash) VALUES (?, ?)',
+          args: [username, hash]
+        });
+        console.log('✅ Turso Admin user seeded: ' + username);
+      }
+    } catch (err) {
+      console.error('Error seeding Turso admin:', err.message);
+    }
+  } else {
+    // Local fallback seeding
+    const data = loadLocalData();
+    const existing = data.admin_users.find(u => u.username === username);
+    if (!existing) {
+      const hash = bcrypt.hashSync(password, 10);
+      data.admin_users.push({ id: 1, username, password_hash: hash });
+      saveLocalData(data);
+      console.log('✅ Local Admin user seeded: ' + username);
+    }
   }
 }
 
-// ─── Queries (Mirrors SQLite prepared statements interface) ───────────────────
+// ─── Unified Async Queries ────────────────────────────────────────────────────
 const queries = {
   getBookingsByDate: {
-    all: (date, court) => {
-      dbData = loadData();
-      return dbData.bookings
+    all: async (date, court) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute({
+          sql: "SELECT * FROM bookings WHERE booking_date = ? AND court_type = ? AND status != 'cancelled' ORDER BY start_time ASC",
+          args: [date, court]
+        });
+        return res.rows;
+      }
+      const data = loadLocalData();
+      return data.bookings
         .filter(b => b.booking_date === date && b.court_type === court && b.status !== 'cancelled')
         .sort((a, b) => a.start_time.localeCompare(b.start_time));
     }
   },
 
   getAllBookings: {
-    all: () => {
-      dbData = loadData();
-      return [...dbData.bookings].sort((a, b) => {
+    all: async () => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute("SELECT * FROM bookings ORDER BY booking_date DESC, start_time ASC");
+        return res.rows;
+      }
+      const data = loadLocalData();
+      return [...data.bookings].sort((a, b) => {
         const dateComp = b.booking_date.localeCompare(a.booking_date);
         if (dateComp !== 0) return dateComp;
         return a.start_time.localeCompare(b.start_time);
@@ -86,129 +171,200 @@ const queries = {
     }
   },
 
-  getBookingsByDateRange: {
-    all: (startDate, endDate) => {
-      dbData = loadData();
-      return dbData.bookings
-        .filter(b => b.booking_date >= startDate && b.booking_date <= endDate)
-        .sort((a, b) => a.booking_date.localeCompare(b.booking_date));
-    }
-  },
-
   getBookingById: {
-    get: (id) => {
-      dbData = loadData();
-      return dbData.bookings.find(b => String(b.id) === String(id));
+    get: async (id) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute({
+          sql: "SELECT * FROM bookings WHERE id = ?",
+          args: [id]
+        });
+        return res.rows[0];
+      }
+      const data = loadLocalData();
+      return data.bookings.find(b => String(b.id) === String(id));
     }
   },
 
   createBooking: {
-    run: (params) => {
-      dbData = loadData();
-      dbData.lastBookingId = (dbData.lastBookingId || 0) + 1;
-      const newId = dbData.lastBookingId;
+    run: async (p) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute({
+          sql: `INSERT INTO bookings (customer_name, customer_phone, court_type, booking_date, start_time, hours, billed_hours, price, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            p.customer_name,
+            p.customer_phone,
+            p.court_type,
+            p.booking_date,
+            p.start_time,
+            p.hours,
+            p.billed_hours,
+            p.price,
+            p.notes || ''
+          ]
+        });
+        return { lastInsertRowid: Number(res.lastInsertRowid) };
+      }
 
+      const data = loadLocalData();
+      data.lastBookingId = (data.lastBookingId || 0) + 1;
+      const newId = data.lastBookingId;
       const record = {
         id: newId,
-        customer_name: params.customer_name,
-        customer_phone: params.customer_phone,
-        court_type: params.court_type,
-        booking_date: params.booking_date,
-        start_time: params.start_time,
-        hours: params.hours,
-        billed_hours: params.billed_hours,
-        price: params.price,
+        customer_name: p.customer_name,
+        customer_phone: p.customer_phone,
+        court_type: p.court_type,
+        booking_date: p.booking_date,
+        start_time: p.start_time,
+        hours: p.hours,
+        billed_hours: p.billed_hours,
+        price: p.price,
         status: 'confirmed',
-        notes: params.notes || '',
+        notes: p.notes || '',
         created_at: new Date().toISOString()
       };
-
-      dbData.bookings.push(record);
-      saveData(dbData);
+      data.bookings.push(record);
+      saveLocalData(data);
       return { lastInsertRowid: newId };
     }
   },
 
   updateBookingStatus: {
-    run: (status, id) => {
-      dbData = loadData();
-      const booking = dbData.bookings.find(b => String(b.id) === String(id));
-      if (booking) {
-        booking.status = status;
-        saveData(dbData);
+    run: async (status, id) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        await tursoClient.execute({
+          sql: "UPDATE bookings SET status = ? WHERE id = ?",
+          args: [status, id]
+        });
+        return;
+      }
+      const data = loadLocalData();
+      const b = data.bookings.find(x => String(x.id) === String(id));
+      if (b) {
+        b.status = status;
+        saveLocalData(data);
       }
     }
   },
 
   deleteBooking: {
-    run: (id) => {
-      dbData = loadData();
-      dbData.bookings = dbData.bookings.filter(b => String(b.id) !== String(id));
-      saveData(dbData);
+    run: async (id) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        await tursoClient.execute({
+          sql: "DELETE FROM bookings WHERE id = ?",
+          args: [id]
+        });
+        return;
+      }
+      const data = loadLocalData();
+      data.bookings = data.bookings.filter(x => String(x.id) !== String(id));
+      saveLocalData(data);
     }
   },
 
   getBlockedSlots: {
-    all: (date, court) => {
-      dbData = loadData();
-      return dbData.blocked_slots.filter(s => s.block_date === date && s.court_type === court);
+    all: async (date, court) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute({
+          sql: "SELECT * FROM blocked_slots WHERE block_date = ? AND court_type = ?",
+          args: [date, court]
+        });
+        return res.rows;
+      }
+      const data = loadLocalData();
+      return data.blocked_slots.filter(s => s.block_date === date && s.court_type === court);
     }
   },
 
   blockSlot: {
-    run: (params) => {
-      dbData = loadData();
-      dbData.lastBlockedId = (dbData.lastBlockedId || 0) + 1;
-      const newId = dbData.lastBlockedId;
-
-      const record = {
+    run: async (p) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute({
+          sql: "INSERT INTO blocked_slots (court_type, block_date, start_time, hours, reason) VALUES (?, ?, ?, ?, ?)",
+          args: [p.court_type, p.block_date, p.start_time, p.hours || 1, p.reason || 'Admin block']
+        });
+        return { lastInsertRowid: Number(res.lastInsertRowid) };
+      }
+      const data = loadLocalData();
+      data.lastBlockedId = (data.lastBlockedId || 0) + 1;
+      const newId = data.lastBlockedId;
+      data.blocked_slots.push({
         id: newId,
-        court_type: params.court_type,
-        block_date: params.block_date,
-        start_time: params.start_time,
-        hours: params.hours || 1,
-        reason: params.reason || 'Admin block'
-      };
-
-      dbData.blocked_slots.push(record);
-      saveData(dbData);
+        court_type: p.court_type,
+        block_date: p.block_date,
+        start_time: p.start_time,
+        hours: p.hours || 1,
+        reason: p.reason || 'Admin block'
+      });
+      saveLocalData(data);
       return { lastInsertRowid: newId };
     }
   },
 
   deleteBlockedSlot: {
-    run: (id) => {
-      dbData = loadData();
-      dbData.blocked_slots = dbData.blocked_slots.filter(s => String(s.id) !== String(id));
-      saveData(dbData);
+    run: async (id) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        await tursoClient.execute({
+          sql: "DELETE FROM blocked_slots WHERE id = ?",
+          args: [id]
+        });
+        return;
+      }
+      const data = loadLocalData();
+      data.blocked_slots = data.blocked_slots.filter(s => String(s.id) !== String(id));
+      saveLocalData(data);
     }
   },
 
   getAdmin: {
-    get: (username) => {
-      dbData = loadData();
-      return dbData.admin_users.find(u => u.username === username);
+    get: async (username) => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute({
+          sql: "SELECT * FROM admin_users WHERE username = ?",
+          args: [username]
+        });
+        return res.rows[0];
+      }
+      const data = loadLocalData();
+      return data.admin_users.find(u => u.username === username);
     }
   },
 
   getDailyRevenue: {
-    all: () => {
-      dbData = loadData();
+    all: async () => {
+      if (tursoClient) {
+        await initTursoSchema();
+        const res = await tursoClient.execute(`
+          SELECT booking_date, SUM(price) as revenue, COUNT(*) as count
+          FROM bookings
+          WHERE status != 'cancelled'
+          GROUP BY booking_date
+          ORDER BY booking_date DESC
+          LIMIT 30
+        `);
+        return res.rows;
+      }
+      const data = loadLocalData();
       const map = {};
-      dbData.bookings
+      data.bookings
         .filter(b => b.status !== 'cancelled')
         .forEach(b => {
           const d = b.booking_date;
-          if (!map[d]) {
-            map[d] = { booking_date: d, revenue: 0, count: 0 };
-          }
+          if (!map[d]) map[d] = { booking_date: d, revenue: 0, count: 0 };
           map[d].revenue += Number(b.price) || 0;
           map[d].count += 1;
         });
-
       return Object.values(map).sort((a, b) => b.booking_date.localeCompare(a.booking_date));
     }
   }
 };
 
-module.exports = { queries, seedAdmin };
+module.exports = { queries, seedAdmin, initTursoSchema };
