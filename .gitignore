@@ -3,6 +3,7 @@ node_modules/
 *.db
 *.db-wal
 *.db-shm
+*maranets_data.json
 .DS_Store
 Thumbs.db
 npm-debug.log*
